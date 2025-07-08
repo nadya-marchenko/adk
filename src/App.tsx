@@ -1,4 +1,3 @@
-// @ts-nocheck
 import React, { useState } from 'react';
 import {
   ThemeProvider,
@@ -269,7 +268,7 @@ function App(): React.JSX.Element {
           
           <Grid container spacing={3}>
             {/* Performance Metrics */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6} {...({} as any)}>
               <Card>
                 <CardContent>
                   <Typography variant="h5" gutterBottom color="primary">
@@ -303,7 +302,7 @@ function App(): React.JSX.Element {
             </Grid>
 
             {/* Key Insights */}
-            <Grid item xs={12} md={6}>
+            <Grid item xs={12} md={6} {...({} as any)}>
               <Card>
                 <CardContent>
                   <Typography variant="h5" gutterBottom color="primary">
