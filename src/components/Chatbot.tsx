@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   TextField,
-  Button,
   Typography,
   Paper,
   CircularProgress,
@@ -20,8 +19,25 @@ import {
 } from '@mui/icons-material';
 import { Groq } from 'groq-sdk';
 
+// Types for fund terminology
+interface TerminologyInfo {
+  term: string;
+  definition: string;
+  category: string;
+  verified: boolean;
+}
+
+interface Message {
+  type: 'user' | 'bot';
+  content: string;
+  timestamp: Date;
+  verified?: TerminologyInfo;
+  extractedTerms?: string[];
+  error?: boolean;
+}
+
 // Fund terminology database for verification
-const FUND_TERMINOLOGY_DB = {
+const FUND_TERMINOLOGY_DB: Record<string, TerminologyInfo> = {
   'esg': {
     term: 'ESG',
     definition: 'Environmental, Social, and Governance. A framework used to evaluate a company\'s sustainability and ethical impact. Environmental factors include climate change and resource usage. Social factors cover labor practices and community relations. Governance involves board structure and executive compensation.',
@@ -72,18 +88,18 @@ const FUND_TERMINOLOGY_DB = {
   }
 };
 
-const Chatbot = () => {
-  const [messages, setMessages] = useState([
+const Chatbot: React.FC = () => {
+  const [messages, setMessages] = useState<Message[]>([
     {
       type: 'bot',
       content: 'Hello! I\'m your Fund Terminology Assistant. I can help you understand financial terms like ESG, Alpha, Sharpe Ratio, and more. Just ask me about any fund-related terminology!',
       timestamp: new Date()
     }
   ]);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [groqClient, setGroqClient] = useState(null);
-  const messagesEndRef = useRef(null);
+  const [input, setInput] = useState<string>('');
+  const [loading, setLoading] = useState<boolean>(false);
+  const [groqClient, setGroqClient] = useState<Groq | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Initialize Groq client
@@ -101,17 +117,17 @@ const Chatbot = () => {
     scrollToBottom();
   }, [messages]);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = (): void => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const verifyTerminology = (term) => {
+  const verifyTerminology = (term: string): TerminologyInfo | null => {
     const normalizedTerm = term.toLowerCase();
     return FUND_TERMINOLOGY_DB[normalizedTerm] || null;
   };
 
-  const extractTermsFromQuery = (query) => {
-    const terms = [];
+  const extractTermsFromQuery = (query: string): string[] => {
+    const terms: string[] = [];
     const queryLower = query.toLowerCase();
     
     Object.keys(FUND_TERMINOLOGY_DB).forEach(term => {
@@ -123,12 +139,12 @@ const Chatbot = () => {
     return terms;
   };
 
-  const handleSend = async () => {
-    if (!input.trim()) return;
+  const handleSendMessage = async (messageText: string): Promise<void> => {
+    if (!messageText.trim()) return;
 
-    const userMessage = {
+    const userMessage: Message = {
       type: 'user',
-      content: input,
+      content: messageText,
       timestamp: new Date()
     };
 
@@ -137,8 +153,8 @@ const Chatbot = () => {
 
     try {
       // Check if we have a verified definition
-      const extractedTerms = extractTermsFromQuery(input);
-      let verifiedInfo = null;
+      const extractedTerms = extractTermsFromQuery(messageText);
+      let verifiedInfo: TerminologyInfo | null = null;
       
       if (extractedTerms.length > 0) {
         verifiedInfo = verifyTerminology(extractedTerms[0]);
@@ -160,29 +176,29 @@ const Chatbot = () => {
         const response = await groqClient.chat.completions.create({
           messages: [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: input }
+            { role: 'user', content: messageText }
           ],
           model: 'llama3-8b-8192',
           temperature: 0.3,
           max_tokens: 300
         });
 
-        const botResponse = {
+        const botResponse: Message = {
           type: 'bot',
-          content: response.choices[0].message.content,
+          content: response.choices[0].message.content || 'Sorry, I couldn\'t generate a response.',
           timestamp: new Date(),
-          verified: verifiedInfo,
+          verified: verifiedInfo || undefined,
           extractedTerms: extractedTerms
         };
 
         setMessages(prev => [...prev, botResponse]);
       } else {
         // Fallback response if Groq is not available
-        const fallbackResponse = {
+        const fallbackResponse: Message = {
           type: 'bot',
           content: 'I need a Groq API key to provide AI-powered responses. Please set up your REACT_APP_GROQ_API_KEY environment variable. However, I can still help with verified definitions!',
           timestamp: new Date(),
-          verified: verifiedInfo,
+          verified: verifiedInfo || undefined,
           extractedTerms: extractedTerms
         };
 
@@ -193,15 +209,15 @@ const Chatbot = () => {
       console.error('Error calling Groq API:', error);
       
       // Show error with any verified information we might have
-      const extractedTerms = extractTermsFromQuery(input);
+      const extractedTerms = extractTermsFromQuery(messageText);
       const verifiedInfo = extractedTerms.length > 0 ? verifyTerminology(extractedTerms[0]) : null;
       
-      const errorResponse = {
+      const errorResponse: Message = {
         type: 'bot',
         content: 'Sorry, I encountered an error. Please check your API key or try again later.',
         timestamp: new Date(),
         error: true,
-        verified: verifiedInfo,
+        verified: verifiedInfo || undefined,
         extractedTerms: extractedTerms
       };
 
@@ -212,14 +228,23 @@ const Chatbot = () => {
     setInput('');
   };
 
-  const handleKeyPress = (e) => {
+  const handleSend = async (): Promise<void> => {
+    await handleSendMessage(input);
+  };
+
+  // Fixed: Send message immediately when chip is clicked
+  const handleSuggestedQueryClick = async (query: string): Promise<void> => {
+    await handleSendMessage(query);
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLDivElement>): void => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
     }
   };
 
-  const formatMessage = (message) => {
+  const formatMessage = (message: Message): React.JSX.Element => {
     return (
       <Paper 
         key={message.timestamp.getTime()}
@@ -227,7 +252,6 @@ const Chatbot = () => {
           p: 2, 
           mb: 2, 
           maxWidth: '80%',
-          alignSelf: message.type === 'user' ? 'flex-end' : 'flex-start',
           backgroundColor: message.type === 'user' ? 'primary.main' : 'grey.100',
           color: message.type === 'user' ? 'white' : 'text.primary'
         }}
@@ -287,7 +311,7 @@ const Chatbot = () => {
     );
   };
 
-  const suggestedQueries = [
+  const suggestedQueries: string[] = [
     "What is ESG?",
     "Explain Alpha in investing",
     "What is Sharpe Ratio?",
@@ -314,7 +338,7 @@ const Chatbot = () => {
       )}
 
       {/* Suggested Queries */}
-      <Box sx={{ mb: 2, mx: 3 }}>
+      <Box sx={{ mb: 2, px: 3 }}>
         <Typography variant="subtitle2" gutterBottom>
           Try asking about:
         </Typography>
@@ -323,7 +347,7 @@ const Chatbot = () => {
             <Chip
               key={index}
               label={query}
-              onClick={() => setInput(query)}
+              onClick={() => handleSuggestedQueryClick(query)}
               variant="outlined"
               size="small"
               sx={{ cursor: 'pointer' }}
@@ -340,10 +364,14 @@ const Chatbot = () => {
           display: 'flex', 
           flexDirection: 'column',
           p: 1,
-          mx: 3
+          px: 3
         }}
       >
-        {messages.map((message, index) => formatMessage(message))}
+        {messages.map((message, index) => (
+          <Box key={index} sx={{ display: 'flex', width: '100%', justifyContent: message.type === 'user' ? 'flex-end' : 'flex-start' }}>
+            {formatMessage(message)}
+          </Box>
+        ))}
         {loading && (
           <Box sx={{ display: 'flex', justifyContent: 'center', my: 2 }}>
             <CircularProgress size={24} />
