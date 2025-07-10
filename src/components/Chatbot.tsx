@@ -85,6 +85,12 @@ const FUND_TERMINOLOGY_DB: Record<string, TerminologyInfo> = {
     definition: 'A company that owns, operates, or finances income-generating real estate. REITs provide investors a way to earn a share of income from real estate investments without having to buy properties directly.',
     category: 'Asset Classes',
     verified: true
+  },
+  'cat': {
+    term: 'CAT',
+    definition: 'Total Annual Cost Coca Cola or Consolidated Audit Trail.',
+    category: 'CAT',
+    verified: true
   }
 };
 
