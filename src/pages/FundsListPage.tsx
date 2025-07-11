@@ -18,13 +18,19 @@ import {
     Toolbar,
     TextField,
     InputAdornment,
-    Button
+    Button,
+    Tabs,
+    Tab,
+    Grid
 } from '@mui/material';
 import {
     Search,
     List as ListIcon,
     TrendingUp,
-    Shield
+    Shield,
+    AutoFixHigh,
+    SmartToy,
+    Psychology
 } from '@mui/icons-material';
 import { 
     apiService, 
@@ -39,11 +45,49 @@ import FundsFiltersComponent from '../components/funds/FundsFilters';
 import FundWidget from '../components/funds/FundWidget';
 import { testBackendConnection, testDirectBackendAccess } from '../utils/testBackend';
 
+// Tab configuration
+interface TabConfig {
+    id: number;
+    label: string;
+    icon: React.ReactElement;
+    description: string;
+}
+
+const tabs: TabConfig[] = [
+    {
+        id: 0,
+        label: 'Existing AI Widgets',
+        icon: <TrendingUp />,
+        description: 'Current AI-based widgets that receive params from AI and filter funds on backend'
+    },
+    {
+        id: 1,
+        label: 'AI-Enhanced Widgets',
+        icon: <AutoFixHigh />,
+        description: 'AI analyzes ALL fund data to select best funds for Top Performers and Steady Performers themes'
+    },
+    {
+        id: 2,
+        label: 'AI-Generated Widgets',
+        icon: <SmartToy />,
+        description: 'Fully AI-generated widgets with custom names and filtering parameters'
+    },
+    {
+        id: 3,
+        label: 'AI-Curated Widgets',
+        icon: <Psychology />,
+        description: 'AI generates widget names, analyzes fund data, and returns curated selections'
+    }
+];
+
 const FundsListPage: React.FC = () => {
     const [funds, setFunds] = useState<Fund[]>([]);
     const [total, setTotal] = useState<number>(0);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    
+    // Tab state
+    const [activeTab, setActiveTab] = useState<number>(0);
     
     // Pagination state
     const [page, setPage] = useState<number>(0);
@@ -60,89 +104,155 @@ const FundsListPage: React.FC = () => {
     // Available sortable fields
     const [sortableFields, setSortableFields] = useState<string[]>([]);
     
-    // Widget state
-    const [widget1Data, setWidget1Data] = useState<WidgetData | null>(null);
-    const [widget1Loading, setWidget1Loading] = useState<boolean>(false);
-    const [widget1Error, setWidget1Error] = useState<string | null>(null);
+    // Widget state for Tab 0 (Existing AI Widgets)
+    const [existingWidget1Data, setExistingWidget1Data] = useState<WidgetData | null>(null);
+    const [existingWidget2Data, setExistingWidget2Data] = useState<WidgetData | null>(null);
+    const [existingWidgetsLoading, setExistingWidgetsLoading] = useState<boolean>(false);
     
-    const [widget2Data, setWidget2Data] = useState<WidgetData | null>(null);
-    const [widget2Loading, setWidget2Loading] = useState<boolean>(false);
-    const [widget2Error, setWidget2Error] = useState<string | null>(null);
+    // Widget state for Tab 1 (AI-Enhanced Widgets)
+    const [enhancedWidget1Data, setEnhancedWidget1Data] = useState<WidgetData | null>(null);
+    const [enhancedWidget2Data, setEnhancedWidget2Data] = useState<WidgetData | null>(null);
+    const [enhancedWidgetsLoading, setEnhancedWidgetsLoading] = useState<boolean>(false);
+    
+    // Widget state for Tab 2 (AI-Generated Widgets)
+    const [generatedWidget1Data, setGeneratedWidget1Data] = useState<WidgetData | null>(null);
+    const [generatedWidget2Data, setGeneratedWidget2Data] = useState<WidgetData | null>(null);
+    const [generatedWidgetsLoading, setGeneratedWidgetsLoading] = useState<boolean>(false);
+    
+    // Widget state for Tab 3 (AI-Curated Widgets)
+    const [curatedWidget1Data, setCuratedWidget1Data] = useState<WidgetData | null>(null);
+    const [curatedWidget2Data, setCuratedWidget2Data] = useState<WidgetData | null>(null);
+    const [curatedWidgetsLoading, setCuratedWidgetsLoading] = useState<boolean>(false);
+    
+    // Widget errors for each tab
+    const [existingWidget1Error, setExistingWidget1Error] = useState<string | null>(null);
+    const [existingWidget2Error, setExistingWidget2Error] = useState<string | null>(null);
+    const [enhancedWidget1Error, setEnhancedWidget1Error] = useState<string | null>(null);
+    const [enhancedWidget2Error, setEnhancedWidget2Error] = useState<string | null>(null);
+    const [generatedWidget1Error, setGeneratedWidget1Error] = useState<string | null>(null);
+    const [generatedWidget2Error, setGeneratedWidget2Error] = useState<string | null>(null);
+    const [curatedWidget1Error, setCuratedWidget1Error] = useState<string | null>(null);
+    const [curatedWidget2Error, setCuratedWidget2Error] = useState<string | null>(null);
 
+    // Load funds data
     const loadFunds = useCallback(async () => {
-        console.log('🚀 Starting to load funds...');
         setLoading(true);
         setError(null);
 
         try {
             const queryParams: FundsQueryParams = {
-                ...filters,
+                skip: page * rowsPerPage,
+                limit: rowsPerPage,
                 sort_by: sortBy,
                 sort_order: sortOrder,
-                skip: page * rowsPerPage,
-                limit: rowsPerPage
+                manager: searchTerm || undefined,
+                ...filters
             };
 
-            // Add search functionality (assuming backend supports it)
-            if (searchTerm.trim()) {
-                queryParams.manager = searchTerm.trim();
-            }
-
-            console.log('📋 Loading funds with params:', queryParams);
-            const response: FundsResponse = await apiService.getFunds(queryParams);
-            
-            console.log('📊 Received funds response:', response);
+            const response = await apiService.getFunds(queryParams);
             setFunds(response.funds);
             setTotal(response.total);
-            console.log('✅ Successfully set funds state');
         } catch (err) {
-            console.error('💥 Error in loadFunds:', err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setError(`Failed to load funds: ${errorMessage}`);
+            setError(errorMessage);
         } finally {
             setLoading(false);
-            console.log('🏁 Finished loading funds');
         }
-    }, [filters, sortBy, sortOrder, page, rowsPerPage, searchTerm]);
+    }, [page, rowsPerPage, sortBy, sortOrder, searchTerm, filters]);
 
-    // Load widget data (AI-generated)
-    const loadWidget1 = useCallback(async () => {
-        console.log('🚀 Loading AI-generated best performing funds widget...');
-        setWidget1Loading(true);
-        setWidget1Error(null);
+    // Load existing widgets (Tab 0)
+    const loadExistingWidgets = useCallback(async () => {
+        console.log('🚀 Loading existing AI widgets...');
+        setExistingWidgetsLoading(true);
+        setExistingWidget1Error(null);
+        setExistingWidget2Error(null);
 
         try {
-            const widgetData = await apiService.getAIGeneratedWidget('best-performing');
-            console.log('✅ Successfully loaded AI-generated widget:', widgetData);
-            console.log('🤖 AI reasoning:', widgetData.metadata?.aiReasoning);
-            console.log('🔧 AI generated params:', widgetData.metadata?.aiGeneratedParams);
-            setWidget1Data(widgetData);
+            const [widget1, widget2] = await Promise.all([
+                apiService.getAIGeneratedWidget('best-performing'),
+                apiService.getAIGeneratedWidget('most-resilient')
+            ]);
+            
+            setExistingWidget1Data(widget1);
+            setExistingWidget2Data(widget2);
         } catch (err) {
-            console.error('💥 Error loading AI-generated widget:', err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setWidget1Error(`Failed to load widget: ${errorMessage}`);
+            setExistingWidget1Error(errorMessage);
+            setExistingWidget2Error(errorMessage);
         } finally {
-            setWidget1Loading(false);
+            setExistingWidgetsLoading(false);
         }
     }, []);
 
-    const loadWidget2 = useCallback(async () => {
-        console.log('🚀 Loading AI-generated resilient funds widget...');
-        setWidget2Loading(true);
-        setWidget2Error(null);
+    // Load AI-enhanced widgets (Tab 1)
+    const loadEnhancedWidgets = useCallback(async () => {
+        console.log('🚀 Loading AI-enhanced widgets...');
+        setEnhancedWidgetsLoading(true);
+        setEnhancedWidget1Error(null);
+        setEnhancedWidget2Error(null);
 
         try {
-            const widgetData = await apiService.getAIGeneratedWidget('most-resilient');
-            console.log('✅ Successfully loaded AI-generated widget:', widgetData);
-            console.log('🤖 AI reasoning:', widgetData.metadata?.aiReasoning);
-            console.log('🔧 AI generated params:', widgetData.metadata?.aiGeneratedParams);
-            setWidget2Data(widgetData);
+            const [widget1, widget2] = await Promise.all([
+                apiService.getWidgetData('ai-enhanced-top-performers'),
+                apiService.getWidgetData('ai-enhanced-steady-performers')
+            ]);
+            
+            setEnhancedWidget1Data(widget1);
+            setEnhancedWidget2Data(widget2);
         } catch (err) {
-            console.error('💥 Error loading AI-generated widget:', err);
             const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
-            setWidget2Error(`Failed to load widget: ${errorMessage}`);
+            setEnhancedWidget1Error(errorMessage);
+            setEnhancedWidget2Error(errorMessage);
         } finally {
-            setWidget2Loading(false);
+            setEnhancedWidgetsLoading(false);
+        }
+    }, []);
+
+    // Load AI-generated widgets (Tab 2)
+    const loadGeneratedWidgets = useCallback(async () => {
+        console.log('🚀 Loading AI-generated widgets...');
+        setGeneratedWidgetsLoading(true);
+        setGeneratedWidget1Error(null);
+        setGeneratedWidget2Error(null);
+
+        try {
+            const [widget1, widget2] = await Promise.all([
+                apiService.getWidgetData('ai-generated-widget-1'),
+                apiService.getWidgetData('ai-generated-widget-2')
+            ]);
+            
+            setGeneratedWidget1Data(widget1);
+            setGeneratedWidget2Data(widget2);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+            setGeneratedWidget1Error(errorMessage);
+            setGeneratedWidget2Error(errorMessage);
+        } finally {
+            setGeneratedWidgetsLoading(false);
+        }
+    }, []);
+
+    // Load AI-curated widgets (Tab 3)
+    const loadCuratedWidgets = useCallback(async () => {
+        console.log('🚀 Loading AI-curated widgets...');
+        setCuratedWidgetsLoading(true);
+        setCuratedWidget1Error(null);
+        setCuratedWidget2Error(null);
+
+        try {
+            const [widget1, widget2] = await Promise.all([
+                apiService.getWidgetData('ai-curated-widget-1'),
+                apiService.getWidgetData('ai-curated-widget-2')
+            ]);
+            
+            setCuratedWidget1Data(widget1);
+            setCuratedWidget2Data(widget2);
+        } catch (err) {
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+            setCuratedWidget1Error(errorMessage);
+            setCuratedWidget2Error(errorMessage);
+        } finally {
+            setCuratedWidgetsLoading(false);
         }
     }, []);
 
@@ -157,32 +267,29 @@ const FundsListPage: React.FC = () => {
                 console.log('✅ Successfully set sortable fields state');
             } catch (err) {
                 console.error('💥 Error loading sortable fields:', err);
-                // Don't set an error state for sortable fields, just log it
-                // The table will still work without sortable field validation
-            }
-        };
-
-        const loadCreativeNames = async () => {
-            console.log('🚀 Loading creative widget names...');
-            try {
-                const names = await apiService.generateWidgetNames();
-                console.log('🎨 Received creative widget names:', names);
-                console.log('✅ Successfully loaded creative names');
-            } catch (err) {
-                console.error('💥 Error loading creative names:', err);
-                // This is optional, don't show user errors
             }
         };
 
         loadSortableFields();
-        loadWidget1();
-        loadWidget2();
-        
-        // Load creative names for future use
-        if (process.env.NODE_ENV === 'development') {
-            loadCreativeNames();
+    }, []);
+
+    // Load widgets based on active tab
+    useEffect(() => {
+        switch (activeTab) {
+            case 0:
+                loadExistingWidgets();
+                break;
+            case 1:
+                loadEnhancedWidgets();
+                break;
+            case 2:
+                loadGeneratedWidgets();
+                break;
+            case 3:
+                loadCuratedWidgets();
+                break;
         }
-    }, [loadWidget1, loadWidget2]);
+    }, [activeTab, loadExistingWidgets, loadEnhancedWidgets, loadGeneratedWidgets, loadCuratedWidgets]);
 
     // Load funds when dependencies change
     useEffect(() => {
@@ -198,15 +305,10 @@ const FundsListPage: React.FC = () => {
         setPage(0);
     };
 
-    const handleSort = (field: string): void => {
-        if (!sortableFields.includes(field)) return;
-        
-        if (sortBy === field) {
-            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
-        } else {
-            setSortBy(field);
-            setSortOrder('desc');
-        }
+    const handleRequestSort = (field: string): void => {
+        const isAsc = sortBy === field && sortOrder === 'asc';
+        setSortOrder(isAsc ? 'desc' : 'asc');
+        setSortBy(field);
         setPage(0);
     };
 
@@ -226,26 +328,319 @@ const FundsListPage: React.FC = () => {
         setPage(0);
     };
 
-    const getSortDirection = (field: string): 'asc' | 'desc' | false => {
-        if (sortBy !== field) return false;
-        return sortOrder;
+    const handleTabChange = (event: React.SyntheticEvent, newValue: number): void => {
+        setActiveTab(newValue);
     };
 
-    const isSortable = (field: string): boolean => {
-        return sortableFields.includes(field);
-    };
-
-    const formatColumnHeader = (field: string): string => {
-        const headerMap: { [key: string]: string } = {
-            name: 'Fund Name',
-            aum: 'AUM',
-            return1Year: '1Y Return',
-            sharpeRatio: 'Sharpe Ratio',
-            riskLevel: 'Risk Level',
-            category: 'Category',
-            morningstarRating: 'Rating'
-        };
-        return headerMap[field] || field;
+    const renderWidgetsForTab = () => {
+        switch (activeTab) {
+            case 0: // Existing AI Widgets
+                return (
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                        <FundWidget
+                            title={existingWidget1Data?.title || "Top Performers"}
+                            description={existingWidget1Data?.description || "AI-curated top performing funds"}
+                            funds={existingWidget1Data?.funds || []}
+                            loading={existingWidgetsLoading}
+                            error={existingWidget1Error}
+                            icon={<TrendingUp />}
+                            color="success"
+                            onViewAll={() => {
+                                if (existingWidget1Data?.metadata?.aiGeneratedParams) {
+                                    const params = existingWidget1Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                        <FundWidget
+                            title={existingWidget2Data?.title || "Steady Performers"}
+                            description={existingWidget2Data?.description || "AI-curated steady performing funds"}
+                            funds={existingWidget2Data?.funds || []}
+                            loading={existingWidgetsLoading}
+                            error={existingWidget2Error}
+                            icon={<Shield />}
+                            color="primary"
+                            onViewAll={() => {
+                                if (existingWidget2Data?.metadata?.aiGeneratedParams) {
+                                    const params = existingWidget2Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                    </Box>
+                );
+                
+            case 1: // AI-Enhanced Widgets
+                return (
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                        <FundWidget
+                            title={enhancedWidget1Data?.title || "AI-Enhanced Top Performers"}
+                            description={enhancedWidget1Data?.description || "AI analyzes ALL fund data to select best Top Performers"}
+                            funds={enhancedWidget1Data?.funds || []}
+                            loading={enhancedWidgetsLoading}
+                            error={enhancedWidget1Error}
+                            icon={<AutoFixHigh />}
+                            color="success"
+                            onViewAll={() => {
+                                if (enhancedWidget1Data?.metadata?.aiGeneratedParams) {
+                                    const params = enhancedWidget1Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                        <FundWidget
+                            title={enhancedWidget2Data?.title || "AI-Enhanced Steady Performers"}
+                            description={enhancedWidget2Data?.description || "AI analyzes ALL fund data to select best Steady Performers"}
+                            funds={enhancedWidget2Data?.funds || []}
+                            loading={enhancedWidgetsLoading}
+                            error={enhancedWidget2Error}
+                            icon={<AutoFixHigh />}
+                            color="primary"
+                            onViewAll={() => {
+                                if (enhancedWidget2Data?.metadata?.aiGeneratedParams) {
+                                    const params = enhancedWidget2Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                    </Box>
+                );
+                
+            case 2: // AI-Generated Widgets
+                return (
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                        <FundWidget
+                            title={generatedWidget1Data?.title || "AI-Generated Widget 1"}
+                            description={generatedWidget1Data?.description || "Fully AI-generated widget with custom parameters"}
+                            funds={generatedWidget1Data?.funds || []}
+                            loading={generatedWidgetsLoading}
+                            error={generatedWidget1Error}
+                            icon={<SmartToy />}
+                            color="warning"
+                            onViewAll={() => {
+                                if (generatedWidget1Data?.metadata?.aiGeneratedParams) {
+                                    const params = generatedWidget1Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                        <FundWidget
+                            title={generatedWidget2Data?.title || "AI-Generated Widget 2"}
+                            description={generatedWidget2Data?.description || "Fully AI-generated widget with custom parameters"}
+                            funds={generatedWidget2Data?.funds || []}
+                            loading={generatedWidgetsLoading}
+                            error={generatedWidget2Error}
+                            icon={<SmartToy />}
+                            color="warning"
+                            onViewAll={() => {
+                                if (generatedWidget2Data?.metadata?.aiGeneratedParams) {
+                                    const params = generatedWidget2Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                    </Box>
+                );
+                
+            case 3: // AI-Curated Widgets
+                return (
+                    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                        <FundWidget
+                            title={curatedWidget1Data?.title || "AI-Curated Widget 1"}
+                            description={curatedWidget1Data?.description || "AI-curated funds with analysis and insights"}
+                            funds={curatedWidget1Data?.funds || []}
+                            loading={curatedWidgetsLoading}
+                            error={curatedWidget1Error}
+                            icon={<Psychology />}
+                            color="error"
+                            onViewAll={() => {
+                                if (curatedWidget1Data?.metadata?.aiGeneratedParams) {
+                                    const params = curatedWidget1Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                        <FundWidget
+                            title={curatedWidget2Data?.title || "AI-Curated Widget 2"}
+                            description={curatedWidget2Data?.description || "AI-curated funds with analysis and insights"}
+                            funds={curatedWidget2Data?.funds || []}
+                            loading={curatedWidgetsLoading}
+                            error={curatedWidget2Error}
+                            icon={<Psychology />}
+                            color="error"
+                            onViewAll={() => {
+                                if (curatedWidget2Data?.metadata?.aiGeneratedParams) {
+                                    const params = curatedWidget2Data.metadata.aiGeneratedParams;
+                                    setFilters({
+                                        category: params.category,
+                                        geography: params.geography,
+                                        riskLevel: params.riskLevel,
+                                        manager: params.manager,
+                                        minReturn1Year: params.minReturn1Year,
+                                        maxReturn1Year: params.maxReturn1Year,
+                                        minEsgScore: params.minEsgScore,
+                                        maxEsgScore: params.maxEsgScore,
+                                        minSharpeRatio: params.minSharpeRatio,
+                                        maxSharpeRatio: params.maxSharpeRatio,
+                                        minVolatility: params.minVolatility,
+                                        maxVolatility: params.maxVolatility,
+                                        morningstarRating: params.morningstarRating,
+                                        isActive: params.isActive,
+                                        isSustainable: params.isSustainable,
+                                        currency: params.currency,
+                                    });
+                                    if (params.sort_by) setSortBy(params.sort_by);
+                                    if (params.sort_order) setSortOrder(params.sort_order);
+                                }
+                                setPage(0);
+                            }}
+                        />
+                    </Box>
+                );
+                
+            default:
+                return null;
+        }
     };
 
     if (error) {
@@ -275,98 +670,41 @@ const FundsListPage: React.FC = () => {
                     Funds Explorer
                 </Typography>
                 <Typography variant="subtitle1" color="text.secondary">
-                    Comprehensive fund database with advanced filtering and analysis
+                    Comprehensive fund database with advanced filtering and AI-powered analysis
                 </Typography>
-                
+            </Box>
 
+            {/* Tabs */}
+            <Box sx={{ mb: 4 }}>
+                <Tabs 
+                    value={activeTab} 
+                    onChange={handleTabChange} 
+                    variant="scrollable"
+                    scrollButtons="auto"
+                    sx={{ borderBottom: 1, borderColor: 'divider' }}
+                >
+                    {tabs.map((tab) => (
+                        <Tab 
+                            key={tab.id}
+                            label={tab.label}
+                            icon={tab.icon}
+                            iconPosition="start"
+                            sx={{ minHeight: 48 }}
+                        />
+                    ))}
+                </Tabs>
+                
+                {/* Tab description */}
+                <Box sx={{ mt: 2, mb: 3 }}>
+                    <Typography variant="body2" color="text.secondary">
+                        {tabs[activeTab].description}
+                    </Typography>
+                </Box>
             </Box>
 
             {/* Widgets Section */}
             <Box sx={{ mb: 4 }}>
-                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
-                    <FundWidget
-                        title={widget1Data?.title || "AI-Generated Top Funds"}
-                        description={widget1Data?.description || "AI-curated funds based on performance analysis"}
-                        funds={widget1Data?.funds || []}
-                        loading={widget1Loading}
-                        error={widget1Error}
-                        icon={<TrendingUp />}
-                        color="success"
-                        onViewAll={() => {
-                            // Apply AI-generated filters if available, otherwise fallback
-                            if (widget1Data?.metadata?.aiGeneratedParams) {
-                                const params = widget1Data.metadata.aiGeneratedParams;
-                                setFilters({
-                                    category: params.category,
-                                    geography: params.geography,
-                                    riskLevel: params.riskLevel,
-                                    manager: params.manager,
-                                    minReturn1Year: params.minReturn1Year,
-                                    maxReturn1Year: params.maxReturn1Year,
-                                    minEsgScore: params.minEsgScore,
-                                    maxEsgScore: params.maxEsgScore,
-                                    minSharpeRatio: params.minSharpeRatio,
-                                    maxSharpeRatio: params.maxSharpeRatio,
-                                    minVolatility: params.minVolatility,
-                                    maxVolatility: params.maxVolatility,
-                                    morningstarRating: params.morningstarRating,
-                                    isActive: params.isActive,
-                                    isSustainable: params.isSustainable,
-                                    currency: params.currency,
-                                });
-                                if (params.sort_by) setSortBy(params.sort_by);
-                                if (params.sort_order) setSortOrder(params.sort_order);
-                            } else {
-                                // Fallback filters
-                                setFilters({ minReturn1Year: 0.1 });
-                                setSortBy('return1Year');
-                                setSortOrder('desc');
-                            }
-                            setPage(0);
-                        }}
-                    />
-                    <FundWidget
-                        title={widget2Data?.title || "AI-Generated Resilient Funds"}
-                        description={widget2Data?.description || "AI-curated funds based on resilience analysis"}
-                        funds={widget2Data?.funds || []}
-                        loading={widget2Loading}
-                        error={widget2Error}
-                        icon={<Shield />}
-                        color="primary"
-                        onViewAll={() => {
-                            // Apply AI-generated filters if available, otherwise fallback
-                            if (widget2Data?.metadata?.aiGeneratedParams) {
-                                const params = widget2Data.metadata.aiGeneratedParams;
-                                setFilters({
-                                    category: params.category,
-                                    geography: params.geography,
-                                    riskLevel: params.riskLevel,
-                                    manager: params.manager,
-                                    minReturn1Year: params.minReturn1Year,
-                                    maxReturn1Year: params.maxReturn1Year,
-                                    minEsgScore: params.minEsgScore,
-                                    maxEsgScore: params.maxEsgScore,
-                                    minSharpeRatio: params.minSharpeRatio,
-                                    maxSharpeRatio: params.maxSharpeRatio,
-                                    minVolatility: params.minVolatility,
-                                    maxVolatility: params.maxVolatility,
-                                    morningstarRating: params.morningstarRating,
-                                    isActive: params.isActive,
-                                    isSustainable: params.isSustainable,
-                                    currency: params.currency,
-                                });
-                                if (params.sort_by) setSortBy(params.sort_by);
-                                if (params.sort_order) setSortOrder(params.sort_order);
-                            } else {
-                                // Fallback filters
-                                setFilters({ minSharpeRatio: 0.5 });
-                                setSortBy('sharpeRatio');
-                                setSortOrder('desc');
-                            }
-                            setPage(0);
-                        }}
-                    />
-                </Box>
+                {renderWidgetsForTab()}
             </Box>
 
             {/* Search and Filters */}
@@ -403,102 +741,76 @@ const FundsListPage: React.FC = () => {
 
             {/* Funds Table */}
             <Card>
-                <CardContent sx={{ p: 0 }}>
-                    <TableContainer component={Paper}>
+                <CardContent>
+                    <Typography variant="h6" gutterBottom>
+                        Fund Performance Overview
+                    </Typography>
+                    <TableContainer component={Paper} sx={{ mt: 2 }}>
                         <Table>
                             <TableHead>
                                 <TableRow>
-                                    <TableCell width={50}></TableCell>
-                                    <TableCell>
-                                        {isSortable('name') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'name'}
-                                                direction={getSortDirection('name') || 'asc'}
-                                                onClick={() => handleSort('name')}
-                                            >
-                                                {formatColumnHeader('name')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('name')
-                                        )}
+                                    <TableCell>Fund Name</TableCell>
+                                    <TableCell>Manager</TableCell>
+                                    <TableCell>AUM</TableCell>
+                                    <TableCell 
+                                        align="right"
+                                        sortDirection={sortBy === 'return1Month' ? sortOrder : false}
+                                    >
+                                        <TableSortLabel
+                                            active={sortBy === 'return1Month'}
+                                            direction={sortBy === 'return1Month' ? sortOrder : 'asc'}
+                                            onClick={() => handleRequestSort('return1Month')}
+                                        >
+                                            1M Return
+                                        </TableSortLabel>
                                     </TableCell>
-                                    <TableCell>
-                                        {isSortable('aum') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'aum'}
-                                                direction={getSortDirection('aum') || 'asc'}
-                                                onClick={() => handleSort('aum')}
-                                            >
-                                                {formatColumnHeader('aum')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('aum')
-                                        )}
+                                    <TableCell 
+                                        align="right"
+                                        sortDirection={sortBy === 'return3Month' ? sortOrder : false}
+                                    >
+                                        <TableSortLabel
+                                            active={sortBy === 'return3Month'}
+                                            direction={sortBy === 'return3Month' ? sortOrder : 'asc'}
+                                            onClick={() => handleRequestSort('return3Month')}
+                                        >
+                                            3M Return
+                                        </TableSortLabel>
                                     </TableCell>
-                                    <TableCell align="right">
-                                        {isSortable('return1Year') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'return1Year'}
-                                                direction={getSortDirection('return1Year') || 'asc'}
-                                                onClick={() => handleSort('return1Year')}
-                                            >
-                                                {formatColumnHeader('return1Year')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('return1Year')
-                                        )}
+                                    <TableCell 
+                                        align="right"
+                                        sortDirection={sortBy === 'return1Year' ? sortOrder : false}
+                                    >
+                                        <TableSortLabel
+                                            active={sortBy === 'return1Year'}
+                                            direction={sortBy === 'return1Year' ? sortOrder : 'asc'}
+                                            onClick={() => handleRequestSort('return1Year')}
+                                        >
+                                            1Y Return
+                                        </TableSortLabel>
                                     </TableCell>
-                                    <TableCell align="right">
-                                        {isSortable('sharpeRatio') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'sharpeRatio'}
-                                                direction={getSortDirection('sharpeRatio') || 'asc'}
-                                                onClick={() => handleSort('sharpeRatio')}
-                                            >
-                                                {formatColumnHeader('sharpeRatio')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('sharpeRatio')
-                                        )}
+                                    <TableCell 
+                                        align="right"
+                                        sortDirection={sortBy === 'sharpeRatio' ? sortOrder : false}
+                                    >
+                                        <TableSortLabel
+                                            active={sortBy === 'sharpeRatio'}
+                                            direction={sortBy === 'sharpeRatio' ? sortOrder : 'asc'}
+                                            onClick={() => handleRequestSort('sharpeRatio')}
+                                        >
+                                            Sharpe Ratio
+                                        </TableSortLabel>
                                     </TableCell>
-                                    <TableCell>
-                                        {isSortable('riskLevel') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'riskLevel'}
-                                                direction={getSortDirection('riskLevel') || 'asc'}
-                                                onClick={() => handleSort('riskLevel')}
-                                            >
-                                                {formatColumnHeader('riskLevel')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('riskLevel')
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {isSortable('category') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'category'}
-                                                direction={getSortDirection('category') || 'asc'}
-                                                onClick={() => handleSort('category')}
-                                            >
-                                                {formatColumnHeader('category')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('category')
-                                        )}
-                                    </TableCell>
-                                    <TableCell>
-                                        {isSortable('morningstarRating') ? (
-                                            <TableSortLabel
-                                                active={sortBy === 'morningstarRating'}
-                                                direction={getSortDirection('morningstarRating') || 'asc'}
-                                                onClick={() => handleSort('morningstarRating')}
-                                            >
-                                                {formatColumnHeader('morningstarRating')}
-                                            </TableSortLabel>
-                                        ) : (
-                                            formatColumnHeader('morningstarRating')
-                                        )}
+                                    <TableCell 
+                                        align="right"
+                                        sortDirection={sortBy === 'volatility' ? sortOrder : false}
+                                    >
+                                        <TableSortLabel
+                                            active={sortBy === 'volatility'}
+                                            direction={sortBy === 'volatility' ? sortOrder : 'asc'}
+                                            onClick={() => handleRequestSort('volatility')}
+                                        >
+                                            Volatility
+                                        </TableSortLabel>
                                     </TableCell>
                                 </TableRow>
                             </TableHead>
