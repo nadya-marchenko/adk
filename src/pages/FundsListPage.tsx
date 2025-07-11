@@ -22,17 +22,21 @@ import {
 } from '@mui/material';
 import {
     Search,
-    List as ListIcon
+    List as ListIcon,
+    TrendingUp,
+    Shield
 } from '@mui/icons-material';
 import { 
     apiService, 
     Fund, 
     FundsResponse, 
     FundsFilters, 
-    FundsQueryParams 
+    FundsQueryParams,
+    WidgetData 
 } from '../services/api';
 import FundExpandableRow from '../components/funds/FundExpandableRow';
 import FundsFiltersComponent from '../components/funds/FundsFilters';
+import FundWidget from '../components/funds/FundWidget';
 import { testBackendConnection, testDirectBackendAccess } from '../utils/testBackend';
 
 const FundsListPage: React.FC = () => {
@@ -55,6 +59,15 @@ const FundsListPage: React.FC = () => {
     
     // Available sortable fields
     const [sortableFields, setSortableFields] = useState<string[]>([]);
+    
+    // Widget state
+    const [widget1Data, setWidget1Data] = useState<WidgetData | null>(null);
+    const [widget1Loading, setWidget1Loading] = useState<boolean>(false);
+    const [widget1Error, setWidget1Error] = useState<string | null>(null);
+    
+    const [widget2Data, setWidget2Data] = useState<WidgetData | null>(null);
+    const [widget2Loading, setWidget2Loading] = useState<boolean>(false);
+    const [widget2Error, setWidget2Error] = useState<string | null>(null);
 
     const loadFunds = useCallback(async () => {
         console.log('🚀 Starting to load funds...');
@@ -92,6 +105,47 @@ const FundsListPage: React.FC = () => {
         }
     }, [filters, sortBy, sortOrder, page, rowsPerPage, searchTerm]);
 
+    // Load widget data (AI-generated)
+    const loadWidget1 = useCallback(async () => {
+        console.log('🚀 Loading AI-generated best performing funds widget...');
+        setWidget1Loading(true);
+        setWidget1Error(null);
+
+        try {
+            const widgetData = await apiService.getAIGeneratedWidget('best-performing');
+            console.log('✅ Successfully loaded AI-generated widget:', widgetData);
+            console.log('🤖 AI reasoning:', widgetData.metadata?.aiReasoning);
+            console.log('🔧 AI generated params:', widgetData.metadata?.aiGeneratedParams);
+            setWidget1Data(widgetData);
+        } catch (err) {
+            console.error('💥 Error loading AI-generated widget:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+            setWidget1Error(`Failed to load widget: ${errorMessage}`);
+        } finally {
+            setWidget1Loading(false);
+        }
+    }, []);
+
+    const loadWidget2 = useCallback(async () => {
+        console.log('🚀 Loading AI-generated resilient funds widget...');
+        setWidget2Loading(true);
+        setWidget2Error(null);
+
+        try {
+            const widgetData = await apiService.getAIGeneratedWidget('most-resilient');
+            console.log('✅ Successfully loaded AI-generated widget:', widgetData);
+            console.log('🤖 AI reasoning:', widgetData.metadata?.aiReasoning);
+            console.log('🔧 AI generated params:', widgetData.metadata?.aiGeneratedParams);
+            setWidget2Data(widgetData);
+        } catch (err) {
+            console.error('💥 Error loading AI-generated widget:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+            setWidget2Error(`Failed to load widget: ${errorMessage}`);
+        } finally {
+            setWidget2Loading(false);
+        }
+    }, []);
+
     // Load sortable fields on mount
     useEffect(() => {
         const loadSortableFields = async () => {
@@ -108,8 +162,27 @@ const FundsListPage: React.FC = () => {
             }
         };
 
+        const loadCreativeNames = async () => {
+            console.log('🚀 Loading creative widget names...');
+            try {
+                const names = await apiService.generateWidgetNames();
+                console.log('🎨 Received creative widget names:', names);
+                console.log('✅ Successfully loaded creative names');
+            } catch (err) {
+                console.error('💥 Error loading creative names:', err);
+                // This is optional, don't show user errors
+            }
+        };
+
         loadSortableFields();
-    }, []);
+        loadWidget1();
+        loadWidget2();
+        
+        // Load creative names for future use
+        if (process.env.NODE_ENV === 'development') {
+            loadCreativeNames();
+        }
+    }, [loadWidget1, loadWidget2]);
 
     // Load funds when dependencies change
     useEffect(() => {
@@ -205,41 +278,95 @@ const FundsListPage: React.FC = () => {
                     Comprehensive fund database with advanced filtering and analysis
                 </Typography>
                 
-                {/* Debug info in development */}
-                {process.env.NODE_ENV === 'development' && (
-                    <Alert severity="info" sx={{ mt: 2 }}>
-                        <Typography variant="body2" sx={{ mb: 2 }}>
-                            <strong>Debug Mode:</strong><br/>
-                            Environment: {process.env.NODE_ENV}<br/>
-                            API URL: http://0.0.0.0:8000<br/>
-                            Sortable Fields: {sortableFields.length > 0 ? sortableFields.join(', ') : 'Not loaded'}<br/>
-                            Current State: {loading ? 'Loading...' : `${funds.length} funds, ${total} total`}
-                        </Typography>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                            <Button 
-                                size="small" 
-                                variant="outlined" 
-                                onClick={() => testBackendConnection()}
-                            >
-                                Test Backend Connection
-                            </Button>
-                            <Button 
-                                size="small" 
-                                variant="outlined" 
-                                onClick={() => testDirectBackendAccess()}
-                            >
-                                Show Test URLs
-                            </Button>
-                            <Button 
-                                size="small" 
-                                variant="outlined" 
-                                onClick={() => loadFunds()}
-                            >
-                                Retry Load Funds
-                            </Button>
-                        </Box>
-                    </Alert>
-                )}
+
+            </Box>
+
+            {/* Widgets Section */}
+            <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+                    <FundWidget
+                        title={widget1Data?.title || "AI-Generated Top Funds"}
+                        description={widget1Data?.description || "AI-curated funds based on performance analysis"}
+                        funds={widget1Data?.funds || []}
+                        loading={widget1Loading}
+                        error={widget1Error}
+                        icon={<TrendingUp />}
+                        color="success"
+                        onViewAll={() => {
+                            // Apply AI-generated filters if available, otherwise fallback
+                            if (widget1Data?.metadata?.aiGeneratedParams) {
+                                const params = widget1Data.metadata.aiGeneratedParams;
+                                setFilters({
+                                    category: params.category,
+                                    geography: params.geography,
+                                    riskLevel: params.riskLevel,
+                                    manager: params.manager,
+                                    minReturn1Year: params.minReturn1Year,
+                                    maxReturn1Year: params.maxReturn1Year,
+                                    minEsgScore: params.minEsgScore,
+                                    maxEsgScore: params.maxEsgScore,
+                                    minSharpeRatio: params.minSharpeRatio,
+                                    maxSharpeRatio: params.maxSharpeRatio,
+                                    minVolatility: params.minVolatility,
+                                    maxVolatility: params.maxVolatility,
+                                    morningstarRating: params.morningstarRating,
+                                    isActive: params.isActive,
+                                    isSustainable: params.isSustainable,
+                                    currency: params.currency,
+                                });
+                                if (params.sort_by) setSortBy(params.sort_by);
+                                if (params.sort_order) setSortOrder(params.sort_order);
+                            } else {
+                                // Fallback filters
+                                setFilters({ minReturn1Year: 0.1 });
+                                setSortBy('return1Year');
+                                setSortOrder('desc');
+                            }
+                            setPage(0);
+                        }}
+                    />
+                    <FundWidget
+                        title={widget2Data?.title || "AI-Generated Resilient Funds"}
+                        description={widget2Data?.description || "AI-curated funds based on resilience analysis"}
+                        funds={widget2Data?.funds || []}
+                        loading={widget2Loading}
+                        error={widget2Error}
+                        icon={<Shield />}
+                        color="primary"
+                        onViewAll={() => {
+                            // Apply AI-generated filters if available, otherwise fallback
+                            if (widget2Data?.metadata?.aiGeneratedParams) {
+                                const params = widget2Data.metadata.aiGeneratedParams;
+                                setFilters({
+                                    category: params.category,
+                                    geography: params.geography,
+                                    riskLevel: params.riskLevel,
+                                    manager: params.manager,
+                                    minReturn1Year: params.minReturn1Year,
+                                    maxReturn1Year: params.maxReturn1Year,
+                                    minEsgScore: params.minEsgScore,
+                                    maxEsgScore: params.maxEsgScore,
+                                    minSharpeRatio: params.minSharpeRatio,
+                                    maxSharpeRatio: params.maxSharpeRatio,
+                                    minVolatility: params.minVolatility,
+                                    maxVolatility: params.maxVolatility,
+                                    morningstarRating: params.morningstarRating,
+                                    isActive: params.isActive,
+                                    isSustainable: params.isSustainable,
+                                    currency: params.currency,
+                                });
+                                if (params.sort_by) setSortBy(params.sort_by);
+                                if (params.sort_order) setSortOrder(params.sort_order);
+                            } else {
+                                // Fallback filters
+                                setFilters({ minSharpeRatio: 0.5 });
+                                setSortBy('sharpeRatio');
+                                setSortOrder('desc');
+                            }
+                            setPage(0);
+                        }}
+                    />
+                </Box>
             </Box>
 
             {/* Search and Filters */}

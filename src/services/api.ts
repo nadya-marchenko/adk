@@ -70,6 +70,8 @@ export interface FundsFilters {
     maxEsgScore?: number;
     minSharpeRatio?: number;
     maxSharpeRatio?: number;
+    minVolatility?: number;
+    maxVolatility?: number;
     morningstarRating?: number;
     isActive?: boolean;
     isSustainable?: boolean;
@@ -87,6 +89,40 @@ export interface FundsPaginationParams {
 }
 
 export type FundsQueryParams = FundsFilters & FundsSortParams & FundsPaginationParams;
+
+// Widget-related interfaces
+export interface WidgetData {
+    id: string;
+    title: string;
+    description: string;
+    funds: Fund[];
+    metadata?: {
+        period?: string;
+        criteria?: string;
+        lastUpdated?: string;
+        aiGeneratedParams?: FundsQueryParams;
+        aiReasoning?: string;
+    };
+}
+
+export interface WidgetResponse {
+    widget: WidgetData;
+    success: boolean;
+    message?: string;
+}
+
+// AI-generated widget configuration
+export interface AIWidgetConfig {
+    id: string;
+    title: string;
+    description: string;
+    queryParams: FundsQueryParams;
+    reasoning?: string;
+    metadata?: {
+        period?: string;
+        criteria?: string;
+    };
+}
 
 const API_BASE_URL = process.env.NODE_ENV === 'production' 
     ? 'https://adk-be.onrender.com' 
@@ -251,6 +287,129 @@ class ApiService {
             
             console.warn('⚠️ Using empty array as fallback for sortable fields');
             return []; // Return empty array as fallback
+        }
+    }
+
+    // Widget Methods
+    async getWidgetData(widgetId: string): Promise<WidgetData> {
+        const url = `${API_BASE_URL}/widgets/${widgetId}`;
+        console.log('🔗 Fetching widget data from:', url);
+        
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                mode: 'cors',
+            });
+            
+            console.log('📡 Widget response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Widget HTTP Error:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+            
+            const rawData = await response.text();
+            console.log('📄 Widget raw response:', rawData);
+            
+            let data: WidgetResponse;
+            try {
+                data = JSON.parse(rawData);
+                console.log('✅ Widget parsed data:', data);
+            } catch (parseError) {
+                console.error('❌ Widget JSON Parse Error:', parseError);
+                throw new Error(`Failed to parse JSON response: ${parseError}`);
+            }
+            
+            if (!data.success || !data.widget) {
+                throw new Error(data.message || 'Widget data is invalid');
+            }
+            
+            if (!Array.isArray(data.widget.funds)) {
+                console.error('❌ Expected funds array in widget, got:', typeof data.widget.funds);
+                throw new Error('Widget does not contain a valid funds array');
+            }
+            
+            console.log('✅ Successfully loaded widget data:', data.widget);
+            return data.widget;
+        } catch (error) {
+            console.error('💥 Error fetching widget data:', error);
+            
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                throw new Error('Network error: Unable to connect to the backend server for widget data.');
+            }
+            
+            throw error;
+        }
+    }
+
+    async getAIGeneratedWidget(widgetType: string): Promise<WidgetData> {
+        return this.getWidgetData(`ai-${widgetType}`);
+    }
+
+    // Legacy methods for backward compatibility
+    async getBestPerformingFunds(): Promise<WidgetData> {
+        return this.getAIGeneratedWidget('best-performing');
+    }
+
+    async getMostResilientFunds(): Promise<WidgetData> {
+        return this.getAIGeneratedWidget('most-resilient');
+    }
+
+    // Creative widget names endpoint
+    async generateWidgetNames(): Promise<string[]> {
+        const url = `${API_BASE_URL}/widgets/generate-names`;
+        console.log('🔗 Fetching creative widget names from:', url);
+        
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                },
+                mode: 'cors',
+            });
+            
+            console.log('📡 Widget names response status:', response.status, response.statusText);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Widget names HTTP Error:', errorText);
+                throw new Error(`HTTP error! status: ${response.status} - ${errorText}`);
+            }
+            
+            const rawData = await response.text();
+            console.log('📄 Widget names raw response:', rawData);
+            
+            let data;
+            try {
+                data = JSON.parse(rawData);
+                console.log('✅ Widget names parsed data:', data);
+            } catch (parseError) {
+                console.error('❌ Widget names JSON Parse Error:', parseError);
+                throw new Error(`Failed to parse JSON response: ${parseError}`);
+            }
+            
+            if (!data.names || !Array.isArray(data.names)) {
+                console.error('❌ Expected names array, got:', typeof data.names);
+                throw new Error('Response does not contain a valid names array');
+            }
+            
+            console.log('✅ Successfully loaded widget names:', data.names);
+            return data.names;
+        } catch (error) {
+            console.error('💥 Error fetching widget names:', error);
+            
+            if (error instanceof TypeError && error.message === 'Failed to fetch') {
+                throw new Error('Network error: Unable to connect to the backend server for widget names.');
+            }
+            
+            throw error;
         }
     }
 }
